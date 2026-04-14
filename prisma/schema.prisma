@@ -83,3 +83,72 @@ model SyncJob {
   completedAt DateTime?
   createdAt   DateTime  @default(now())
 }
+
+
+model ContentIdea {
+  id             String    @id @default(cuid())
+  srNo           Int?      
+  title          String    
+  sourceUrl      String?   
+  whyTalkAboutIt String?   
+  angle          String?   
+  context        String?   
+  inputRequired  String?   
+  topics         String    @default("[]")
+  status         String    @default("Idea")
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+}
+
+// ── Content Intelligence Models ─────────────────────────────
+
+model ContentSource {
+  id            String        @id @default(cuid())
+  name          String
+  platform      String
+  url           String        @unique
+  rssFeedUrl    String?
+  lastScrapedAt DateTime?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  posts         ContentPost[]
+}
+
+model ContentPost {
+  id          String              @id @default(cuid())
+  sourceId    String
+  source      ContentSource       @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  platform    String
+  authorName  String?
+  authorUrl   String?
+  content     String
+  postUrl     String              @unique
+  postedAt    DateTime?
+  scrapedAt   DateTime            @default(now())
+  topics      String              @default("[]")
+  suggestions ContentSuggestion[]
+}
+
+model Persona {
+  id                 String              @id @default(cuid())
+  name               String
+  role               String
+  linkedinProfileUrl String?
+  contextMarkdown    String              @default("")
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  suggestions        ContentSuggestion[]
+}
+
+model ContentSuggestion {
+  id            String      @id @default(cuid())
+  personaId     String
+  persona       Persona     @relation(fields: [personaId], references: [id], onDelete: Cascade)
+  contentPostId String
+  contentPost   ContentPost @relation(fields: [contentPostId], references: [id], onDelete: Cascade)
+  suggestion    String
+  angle         String?
+  hookIdea      String?
+  status        String      @default("pending")
+  createdAt     DateTime    @default(now())
+}

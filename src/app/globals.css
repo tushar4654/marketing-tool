@@ -1041,3 +1041,155 @@ select.form-input {
   background-position: right 16px center;
   padding-right: 40px;
 }
+
+/* ═══════════════════════════════════════════════════════════ */
+/* ── CONTENT INTELLIGENCE ──────────────────────────────────── */
+/* ═══════════════════════════════════════════════════════════ */
+
+/* Sidebar section header */
+.sidebar-section-header {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-tertiary);
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  padding: 20px 14px 6px;
+  margin-top: 8px;
+  border-top: 1px solid var(--separator);
+}
+
+/* Role badge */
+.ci-role-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 4px 12px;
+  border-radius: 100px;
+  letter-spacing: 0.3px;
+}
+
+/* Platform chip */
+.ci-platform-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 100px;
+  background: var(--fill-primary);
+  color: var(--text-secondary);
+}
+.ci-platform-chip[data-platform="linkedin"] { background: var(--blue-dim); color: var(--blue); }
+.ci-platform-chip[data-platform="twitter"] { background: var(--fill-primary); color: var(--text-primary); }
+.ci-platform-chip[data-platform="blog"] { background: var(--orange-dim); color: #D97706; }
+
+/* ── Suggestion Cards ──────────────────────────────────────── */
+
+.ci-suggestions-list {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.ci-suggestion-card {
+  background: var(--surface-2);
+  border-radius: var(--radius-xl);
+  padding: 28px 32px;
+  box-shadow: var(--card-shadow);
+  border: 1px solid var(--separator);
+  transition: all var(--transition);
+  position: relative;
+  overflow: hidden;
+}
+.ci-suggestion-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; bottom: 0;
+  width: 4px;
+  background: linear-gradient(180deg, var(--blue), var(--purple));
+  transition: opacity var(--transition);
+}
+.ci-suggestion-card[data-status="used"]::before {
+  background: linear-gradient(180deg, var(--green), #00C7BE);
+}
+.ci-suggestion-card[data-status="dismissed"] {
+  opacity: 0.6;
+}
+.ci-suggestion-card[data-status="dismissed"]::before {
+  background: var(--fill-secondary);
+}
+.ci-suggestion-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 30px rgba(0,0,0,0.06), 0 0 1px rgba(0,0,0,0.1);
+}
+
+.ci-suggestion-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.ci-suggestion-hook {
+  font-size: 14px;
+  color: var(--text-secondary);
+  padding: 10px 14px;
+  background: var(--orange-dim);
+  border-radius: var(--radius-sm);
+  margin-bottom: 14px;
+  line-height: 1.5;
+}
+
+.ci-suggestion-text {
+  font-size: 15px;
+  line-height: 1.7;
+  color: var(--text-primary);
+  white-space: pre-wrap;
+  margin-bottom: 16px;
+  padding: 16px 20px;
+  background: var(--bg);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--separator);
+  font-weight: 400;
+}
+
+.ci-suggestion-angle {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  margin-bottom: 12px;
+  padding: 10px 14px;
+  background: var(--blue-dim);
+  border-radius: var(--radius-sm);
+}
+
+.ci-suggestion-source {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 10px 0;
+  border-top: 1px solid var(--separator);
+  margin-bottom: 12px;
+}
+
+.ci-suggestion-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-top: 12px;
+  border-top: 1px solid var(--separator);
+}
+
+/* Persona card enhancements */
+.ci-persona-card {
+  transition: all var(--transition);
+}
+.ci-persona-card:hover {
+  border-color: var(--blue);
+}

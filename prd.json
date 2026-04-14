@@ -1,0 +1,168 @@
+{
+  "project": "GTM Content Intelligence",
+  "branchName": "ralph/content-intelligence",
+  "description": "Content Intelligence System - Scrape tracked accounts (LinkedIn/Twitter via Apify), track blogs via RSS, feed content to LLM for posting suggestions with persona context (CEO/CTO/CRO)",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Add ContentSource and ContentPost models to Prisma schema",
+      "description": "As a developer, I need database models to store tracked content sources (LinkedIn, Twitter, Blog/RSS) and their scraped posts.",
+      "acceptanceCriteria": [
+        "Add ContentSource model with fields: id, name, platform (linkedin|twitter|blog), url, rssFeedUrl (optional), lastScrapedAt, createdAt, updatedAt",
+        "Add ContentPost model with fields: id, sourceId (FK), platform, authorName, authorUrl, content, postUrl, postedAt, scrapedAt, topics (JSON string)",
+        "Add Persona model with fields: id, name, role (ceo|cto|cro|custom), contextMarkdown, createdAt, updatedAt",
+        "Add ContentSuggestion model with fields: id, personaId (FK), contentPostId (FK), suggestion, angle, hookIdea, status (pending|used|dismissed), createdAt",
+        "Generate and run migration successfully",
+        "Typecheck passes"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": "Foundation models for the entire content intelligence pipeline"
+    },
+    {
+      "id": "US-002",
+      "title": "Build Twitter scraping integration via Apify",
+      "description": "As a user, I want to scrape latest posts from tracked Twitter accounts using Apify.",
+      "acceptanceCriteria": [
+        "Create src/lib/apifyTwitter.js with function to scrape latest tweets from a Twitter profile URL",
+        "Use Apify Twitter scraper actor",
+        "Parse and store results as ContentPost records linked to the ContentSource",
+        "Create API route POST /api/content-sources/sync-twitter that triggers scraping for all Twitter sources",
+        "Handle rate limits and errors gracefully",
+        "Typecheck passes"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "Reuse existing Apify client pattern from src/lib/apify.js"
+    },
+    {
+      "id": "US-003",
+      "title": "Build LinkedIn post scraping for content intelligence",
+      "description": "As a user, I want to scrape latest posts from tracked LinkedIn accounts for content inspiration.",
+      "acceptanceCriteria": [
+        "Create src/lib/apifyLinkedInContent.js that fetches recent posts from a LinkedIn profile",
+        "Reuse existing Apify LinkedIn scraper pattern but store results as ContentPost records",
+        "Create API route POST /api/content-sources/sync-linkedin that triggers scraping for all LinkedIn content sources",
+        "Deduplicate posts by postUrl",
+        "Typecheck passes"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": "Leverage existing apify.js patterns for LinkedIn scraping"
+    },
+    {
+      "id": "US-004",
+      "title": "Build RSS feed parser for blog tracking",
+      "description": "As a user, I want to track blogs via RSS feeds and automatically pull in new posts.",
+      "acceptanceCriteria": [
+        "Install rss-parser package",
+        "Create src/lib/rssFetcher.js with function to parse RSS feed URL and return structured post data",
+        "Create API route POST /api/content-sources/sync-rss that fetches and stores new blog posts for all RSS sources",
+        "Store each RSS item as a ContentPost with platform=blog",
+        "Deduplicate by postUrl to avoid re-importing",
+        "Typecheck passes"
+      ],
+      "priority": 4,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-005",
+      "title": "Build Persona management UI and API",
+      "description": "As a user, I want to create and manage personas (CEO, CTO, CRO) with company context via markdown.",
+      "acceptanceCriteria": [
+        "Create API routes: GET/POST /api/personas, GET/PUT/DELETE /api/personas/[id]",
+        "Create src/app/personas/page.js with UI to list, create, edit, and delete personas",
+        "Each persona has: name, role dropdown (CEO/CTO/CRO/Custom), and a large markdown textarea for company context",
+        "Include preset templates for CEO (vision/strategy), CTO (technical/innovation), CRO (revenue/growth)",
+        "Style consistent with existing Apple-inspired design system",
+        "Typecheck passes"
+      ],
+      "priority": 5,
+      "passes": false,
+      "notes": "The markdown context is what gives the LLM the voice and angle for each persona"
+    },
+    {
+      "id": "US-006",
+      "title": "Build Content Sources management UI",
+      "description": "As a user, I want to add and manage tracked content sources (LinkedIn profiles, Twitter handles, Blog RSS feeds).",
+      "acceptanceCriteria": [
+        "Create API routes: GET/POST /api/content-sources, DELETE /api/content-sources/[id]",
+        "Create src/app/content-sources/page.js with UI to list all sources grouped by platform",
+        "Add form to create new source with fields: name, platform selector (LinkedIn/Twitter/Blog), URL, RSS feed URL (shown only for Blog)",
+        "Show last scraped timestamp for each source",
+        "Add Sync All button that triggers scraping for all sources",
+        "Style consistent with existing design system",
+        "Typecheck passes"
+      ],
+      "priority": 6,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-007",
+      "title": "Build Content Feed page showing all scraped content",
+      "description": "As a user, I want to see a unified feed of all scraped content from LinkedIn, Twitter, and blogs.",
+      "acceptanceCriteria": [
+        "Create API route GET /api/content-feed with pagination and platform filter",
+        "Create src/app/content-feed/page.js showing all ContentPosts in reverse chronological order",
+        "Add platform filter tabs: All | LinkedIn | Twitter | Blogs",
+        "Each card shows: author name, platform icon, content preview (truncated), posted date, source name",
+        "Clicking a card expands to show full content",
+        "Style consistent with existing design system",
+        "Typecheck passes"
+      ],
+      "priority": 7,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-008",
+      "title": "Build LLM content suggestion engine",
+      "description": "As a user, I want the LLM to analyze scraped content and generate posting suggestions tailored to each persona.",
+      "acceptanceCriteria": [
+        "Create src/lib/contentSuggestionEngine.js that takes a batch of ContentPosts + a Persona and generates suggestions",
+        "Use Gemini API (reuse pattern from llmEvaluator.js) with structured JSON output",
+        "Each suggestion includes: suggested post text, angle/hook, why this topic matters for the persona, source reference",
+        "Create API route POST /api/suggestions/generate that accepts personaId and generates suggestions from recent unseen content",
+        "Store suggestions as ContentSuggestion records",
+        "Typecheck passes"
+      ],
+      "priority": 8,
+      "passes": false,
+      "notes": "The persona contextMarkdown is injected into the LLM prompt as system context"
+    },
+    {
+      "id": "US-009",
+      "title": "Build Suggestions dashboard UI",
+      "description": "As a user, I want to view, filter, and act on AI-generated content suggestions per persona.",
+      "acceptanceCriteria": [
+        "Create src/app/suggestions/page.js showing all suggestions grouped by persona",
+        "Add persona selector dropdown to filter suggestions",
+        "Each suggestion card shows: suggested post text, angle, source post reference, and action buttons (Use/Dismiss)",
+        "Add Generate New Suggestions button that triggers the LLM engine for selected persona",
+        "Dismissed suggestions are hidden but recoverable",
+        "Style consistent with existing design system",
+        "Typecheck passes"
+      ],
+      "priority": 9,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-010",
+      "title": "Add Content Intelligence nav items to sidebar",
+      "description": "As a user, I want to navigate to the new content intelligence pages from the sidebar.",
+      "acceptanceCriteria": [
+        "Add nav items to layout.js sidebar: Content Sources, Content Feed, Personas, Suggestions",
+        "Use appropriate icons for each section",
+        "Group under a Content Intelligence section header in the sidebar",
+        "Active page highlighted correctly",
+        "Typecheck passes"
+      ],
+      "priority": 10,
+      "passes": false,
+      "notes": "Should be added below existing nav items"
+    }
+  ]
+}

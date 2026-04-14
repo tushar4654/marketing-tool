@@ -38,6 +38,7 @@ export default function SettingsPage() {
       })
       .catch(() => {})
       .finally(() => setLoading(false));
+
   }, []);
 
   const save = async () => {
@@ -101,7 +102,7 @@ export default function SettingsPage() {
       <header className="page-header">
         <div>
           <h1>Settings</h1>
-          <p>Configure your company context for AI-powered lead qualification</p>
+          <p>Configure your company context for AI-powered content suggestions</p>
         </div>
         <button className="btn btn-primary" onClick={save} disabled={saving} style={{ borderRadius: 100, padding: '10px 28px' }}>
           {saving ? 'Saving…' : '💾 Save Context'}
@@ -270,7 +271,7 @@ export default function SettingsPage() {
         {/* Custom Prompt */}
         <div className="settings-section">
           <div className="settings-section-header">
-            <span className="settings-section-icon">🧠</span>
+            <span className="settings-section-icon">✏️</span>
             <div>
               <h2>Custom AI Instructions</h2>
               <p>Advanced: Add extra context or instructions for the AI evaluator</p>
