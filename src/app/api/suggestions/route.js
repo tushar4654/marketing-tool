@@ -16,7 +16,7 @@ export async function GET(request) {
       orderBy: { createdAt: 'desc' },
       include: {
         persona: { select: { name: true, role: true, linkedinProfileUrl: true } },
-        contentPost: { select: { content: true, postUrl: true, platform: true, authorName: true, source: { select: { name: true } } } },
+        contentPost: { select: { content: true, postUrl: true, platform: true, authorName: true, postedAt: true, source: { select: { name: true } } } },
       },
       take: 50,
     });
@@ -30,15 +30,20 @@ export async function GET(request) {
 export async function PATCH(request) {
   try {
     const body = await request.json();
-    const { id, status } = body;
+    const { id, status, dismissReason } = body;
 
     if (!id || !status) {
       return NextResponse.json({ error: 'id and status are required' }, { status: 400 });
     }
 
+    const data = { status };
+    if (status === 'dismissed' && dismissReason) {
+      data.dismissReason = dismissReason;
+    }
+
     const suggestion = await prisma.contentSuggestion.update({
       where: { id },
-      data: { status },
+      data,
     });
 
     return NextResponse.json(suggestion);

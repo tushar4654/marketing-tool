@@ -150,5 +150,6 @@ model ContentSuggestion {
   angle         String?
   hookIdea      String?
   status        String      @default("pending")
+  dismissReason  String?
   createdAt     DateTime    @default(now())
 }

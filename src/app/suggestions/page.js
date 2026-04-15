@@ -8,6 +8,17 @@ const ROLE_META = {
   custom: { icon: '✨', label: 'Custom', color: 'var(--purple)' },
 };
 const PLATFORM_ICONS = { linkedin: '💼', twitter: '𝕏', blog: '📝' };
+const PLATFORM_LABELS = { linkedin: 'LinkedIn', twitter: 'Twitter/X', blog: 'Blog' };
+
+const DISMISS_REASONS = [
+  { key: 'not_relevant', label: 'Not relevant to my audience' },
+  { key: 'already_covered', label: 'Topic already covered' },
+  { key: 'too_generic', label: 'Too generic / not specific enough' },
+  { key: 'wrong_tone', label: 'Wrong tone or angle' },
+  { key: 'low_quality', label: 'Source post is low quality' },
+  { key: 'other', label: 'Other reason' },
+];
+
 const REPURPOSE_FORMATS = [
   { key: 'tweet', icon: '🐦', label: 'Tweet' },
   { key: 'thread', icon: '🧵', label: 'Thread' },
@@ -25,13 +36,14 @@ export default function SuggestionsPage() {
   const [generating, setGenerating] = useState(false);
   const [toast, setToast] = useState(null);
   const [copied, setCopied] = useState(null);
-  // Hook variations state
   const [hookLoading, setHookLoading] = useState(null);
   const [hookResults, setHookResults] = useState({});
-  // Repurpose state
   const [repurposeLoading, setRepurposeLoading] = useState(null);
   const [repurposeResults, setRepurposeResults] = useState({});
   const [showRepurpose, setShowRepurpose] = useState(null);
+  const [dismissingId, setDismissingId] = useState(null);
+  const [dismissOtherText, setDismissOtherText] = useState('');
+  const [expandedSource, setExpandedSource] = useState(null);
 
   const showToast = (msg, err) => { setToast({ msg, err }); setTimeout(() => setToast(null), 4000); };
 
@@ -54,7 +66,7 @@ export default function SuggestionsPage() {
   useEffect(() => { loadSuggestions(); }, [selectedPersona, statusFilter]);
 
   const generate = async () => {
-    if (selectedPersona === 'all') { showToast('Select a specific persona to generate suggestions', true); return; }
+    if (selectedPersona === 'all') { showToast('Select a specific persona to generate', true); return; }
     setGenerating(true);
     try {
       const res = await fetch('/api/suggestions/generate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ personaId: selectedPersona }) });
@@ -66,13 +78,19 @@ export default function SuggestionsPage() {
     setGenerating(false);
   };
 
-  const updateStatus = async (id, status) => {
-    try { await fetch('/api/suggestions', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, status }) }); loadSuggestions(); } catch (err) { showToast(err.message, true); }
+  const updateStatus = async (id, status, dismissReason = null) => {
+    try {
+      const body = { id, status };
+      if (dismissReason) body.dismissReason = dismissReason;
+      await fetch('/api/suggestions', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      setDismissingId(null);
+      setDismissOtherText('');
+      loadSuggestions();
+    } catch (err) { showToast(err.message, true); }
   };
 
   const copyText = (text, id) => { navigator.clipboard.writeText(text); setCopied(id); setTimeout(() => setCopied(null), 2000); };
 
-  // Generate hook variations
   const generateHooks = async (suggestionId, suggestionText, angle) => {
     setHookLoading(suggestionId);
     try {
@@ -80,11 +98,10 @@ export default function SuggestionsPage() {
       const data = await res.json();
       if (data.hooks) setHookResults(prev => ({ ...prev, [suggestionId]: data.hooks }));
       else throw new Error(data.error);
-    } catch (err) { showToast('Failed to generate hooks: ' + err.message, true); }
+    } catch (err) { showToast('Failed: ' + err.message, true); }
     setHookLoading(null);
   };
 
-  // Repurpose content
   const repurpose = async (suggestionId, suggestionText, format) => {
     const key = `${suggestionId}_${format}`;
     setRepurposeLoading(key);
@@ -93,7 +110,7 @@ export default function SuggestionsPage() {
       const data = await res.json();
       if (data.content) setRepurposeResults(prev => ({ ...prev, [key]: data }));
       else throw new Error(data.error);
-    } catch (err) { showToast('Failed to repurpose: ' + err.message, true); }
+    } catch (err) { showToast('Failed: ' + err.message, true); }
     setRepurposeLoading(null);
   };
 
@@ -103,7 +120,7 @@ export default function SuggestionsPage() {
         <div>
           <div className="label-mono">Content Intelligence</div>
           <h1>Suggestions</h1>
-          <p>AI-generated posting suggestions tailored to each persona.</p>
+          <p>AI-generated posting suggestions — original post first, your angle second.</p>
         </div>
         <button className="btn btn-primary" onClick={generate} disabled={generating || selectedPersona === 'all'}>
           {generating ? <><span className="spinner" /> Generating…</> : '🧠 Generate Suggestions'}
@@ -111,7 +128,6 @@ export default function SuggestionsPage() {
       </div>
 
       <div className="page-body">
-        {/* Filters */}
         <div style={{ display: 'flex', gap: 16, marginBottom: 24, flexWrap: 'wrap', alignItems: 'center' }}>
           <div className="form-group" style={{ minWidth: 200 }}>
             <label className="form-label">Persona</label>
@@ -134,7 +150,7 @@ export default function SuggestionsPage() {
 
         {personas.length === 0 && !loading && (
           <div className="warning-banner">
-            ⚠️ No personas configured. <a href="/personas" style={{ color: 'inherit', fontWeight: 700 }}>Create a persona</a> first to generate suggestions.
+            ⚠️ No personas configured. <a href="/personas" style={{ color: 'inherit', fontWeight: 700 }}>Create a persona</a> first.
           </div>
         )}
 
@@ -144,7 +160,7 @@ export default function SuggestionsPage() {
           <div className="empty-state">
             <span className="empty-icon">💡</span>
             <h3>No suggestions yet</h3>
-            <p>Select a persona and click "Generate Suggestions" to create AI-powered content ideas from your scraped feed.</p>
+            <p>Select a persona and click "Generate Suggestions" to create AI-powered content ideas.</p>
           </div>
         ) : (
           <div className="ci-suggestions-list">
@@ -153,173 +169,182 @@ export default function SuggestionsPage() {
               const srcPost = s.contentPost;
               const hooks = hookResults[s.id];
               const activeRepurpose = Object.entries(repurposeResults).filter(([k]) => k.startsWith(s.id + '_'));
+              const isSourceExpanded = expandedSource === s.id;
+              const srcContent = srcPost?.content || '';
+              const srcPreview = srcContent.length > 200 ? srcContent.slice(0, 200) + '…' : srcContent;
 
               return (
-                <div className="ci-suggestion-card" key={s.id} data-status={s.status}>
-                  {/* Header */}
-                  <div className="ci-suggestion-header">
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <span className="ci-role-badge" style={{ background: meta.color + '20', color: meta.color }}>{meta.icon} {s.persona?.name}</span>
-                      {s.persona?.linkedinProfileUrl && (
-                        <a href={s.persona.linkedinProfileUrl} target="_blank" rel="noopener" style={{ fontSize: 12, color: 'var(--blue)', textDecoration: 'none' }}>
-                          Post from this account →
-                        </a>
-                      )}
-                    </div>
-                    <span style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>{new Date(s.createdAt).toLocaleDateString()}</span>
-                  </div>
+                <div className="ci-suggestion-card" key={s.id} data-status={s.status} style={{ padding: 0, overflow: 'hidden' }}>
 
-                  {/* Hook */}
-                  {s.hookIdea && (
-                    <div className="ci-suggestion-hook">
-                      <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--orange)' }}>🪝 Hook:</span> {s.hookIdea}
-                    </div>
-                  )}
-
-                  {/* Suggestion text */}
-                  <div className="ci-suggestion-text">{s.suggestion}</div>
-
-                  {/* Angle */}
-                  {s.angle && (
-                    <div className="ci-suggestion-angle">
-                      <span style={{ fontWeight: 600 }}>💡 Angle:</span> {s.angle}
-                    </div>
-                  )}
-
-                  {/* Source reference */}
+                  {/* ─── ORIGINAL POST (PRIMARY) ─── */}
                   {srcPost && (
-                    <div className="ci-suggestion-source">
-                      <span style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>
-                        Inspired by {PLATFORM_ICONS[srcPost.platform]} {srcPost.source?.name || srcPost.authorName || 'Unknown'}
-                      </span>
-                      {srcPost.postUrl && (
-                        <a href={srcPost.postUrl} target="_blank" rel="noopener" style={{ fontSize: 12, color: 'var(--blue)', textDecoration: 'none', marginLeft: 8 }}>
-                          View source →
-                        </a>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Hook Variations */}
-                  {hooks && (
-                    <div style={{ margin: '12px 0', padding: 16, background: 'var(--fill-secondary)', borderRadius: 12 }}>
-                      <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10, color: 'var(--text-primary)' }}>🔄 Hook Variations</div>
-                      {hooks.map((h, i) => (
-                        <div key={i} style={{
-                          padding: '10px 14px', marginBottom: 6, borderRadius: 8,
-                          background: 'var(--bg-primary)', border: '1px solid var(--border-primary)',
-                          display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12,
-                          cursor: 'pointer', transition: 'background 0.15s',
-                        }} onClick={() => copyText(h.hook, `hook_${s.id}_${i}`)}>
-                          <div>
-                            <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--blue)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>{h.style}</span>
-                            <div style={{ fontSize: 14, color: 'var(--text-primary)', marginTop: 2, fontWeight: 500 }}>"{h.hook}"</div>
-                          </div>
-                          <span style={{ fontSize: 11, color: 'var(--text-tertiary)', flexShrink: 0 }}>
-                            {copied === `hook_${s.id}_${i}` ? '✓ Copied' : 'Click to copy'}
-                          </span>
+                    <div style={{ padding: 20, background: 'var(--fill-secondary)', borderBottom: '1px solid var(--border-primary)', cursor: 'pointer' }}
+                      onClick={() => setExpandedSource(isSourceExpanded ? null : s.id)}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+                        <div className={`avatar ${srcPost.platform === 'twitter' ? 'avatar-purple' : srcPost.platform === 'blog' ? 'avatar-orange' : ''}`} style={{ width: 32, height: 32, fontSize: 14 }}>
+                          {PLATFORM_ICONS[srcPost.platform]}
                         </div>
-                      ))}
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>
+                            {srcPost.source?.name || srcPost.authorName || 'Unknown'}
+                          </div>
+                          <div style={{ fontSize: 11, color: 'var(--text-tertiary)', display: 'flex', gap: 8 }}>
+                            <span className="ci-platform-chip" data-platform={srcPost.platform} style={{ fontSize: 10 }}>
+                              {PLATFORM_ICONS[srcPost.platform]} {PLATFORM_LABELS[srcPost.platform]}
+                            </span>
+                            {srcPost.postedAt && <span>{new Date(srcPost.postedAt).toLocaleDateString()}</span>}
+                          </div>
+                        </div>
+                        {srcPost.postUrl && (
+                          <a href={srcPost.postUrl} target="_blank" rel="noopener" onClick={e => e.stopPropagation()} style={{ fontSize: 11, color: 'var(--blue)', textDecoration: 'none' }}>
+                            View original →
+                          </a>
+                        )}
+                        <span style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>{isSourceExpanded ? '▲' : '▼'}</span>
+                      </div>
+                      <div style={{ fontSize: 13, color: 'var(--text-primary)', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
+                        {isSourceExpanded ? srcContent : srcPreview}
+                      </div>
                     </div>
                   )}
 
-                  {/* Repurposed Content */}
-                  {activeRepurpose.length > 0 && (
-                    <div style={{ margin: '12px 0' }}>
-                      {activeRepurpose.map(([key, data]) => {
-                        const fmt = key.split('_').pop();
-                        const fmtMeta = REPURPOSE_FORMATS.find(f => f.key === fmt) || {};
-                        return (
-                          <div key={key} style={{
-                            padding: 16, marginBottom: 8, borderRadius: 12,
-                            background: 'linear-gradient(135deg, rgba(88,86,214,0.04), rgba(0,122,255,0.04))',
-                            border: '1px solid rgba(88,86,214,0.15)',
-                          }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                              <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--purple)' }}>
-                                {fmtMeta.icon} {fmtMeta.label} Format
-                              </span>
-                              <button className="btn-copy" onClick={() => copyText(data.content, key)} style={{ fontSize: 12 }}>
-                                {copied === key ? '✓ Copied!' : '📋 Copy'}
-                              </button>
+                  {/* ─── SUGGESTED ANGLE (SECONDARY) ─── */}
+                  <div style={{ padding: 20 }}>
+                    <div className="ci-suggestion-header">
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>💡 Your Angle</span>
+                        <span className="ci-role-badge" style={{ background: meta.color + '20', color: meta.color }}>{meta.icon} {s.persona?.name}</span>
+                      </div>
+                      <span style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>{new Date(s.createdAt).toLocaleDateString()}</span>
+                    </div>
+
+                    {s.hookIdea && (
+                      <div className="ci-suggestion-hook">
+                        <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--orange)' }}>🪝 Hook:</span> {s.hookIdea}
+                      </div>
+                    )}
+
+                    <div className="ci-suggestion-text">{s.suggestion}</div>
+
+                    {s.angle && (
+                      <div className="ci-suggestion-angle">
+                        <span style={{ fontWeight: 600 }}>💡 Angle:</span> {s.angle}
+                      </div>
+                    )}
+
+                    {/* Dismiss reason badge for dismissed suggestions */}
+                    {s.status === 'dismissed' && s.dismissReason && (
+                      <div style={{ padding: '6px 12px', borderRadius: 8, background: 'rgba(255,59,48,0.06)', border: '1px solid rgba(255,59,48,0.1)', fontSize: 12, color: 'var(--text-secondary)', marginTop: 8 }}>
+                        ❌ Dismissed: {DISMISS_REASONS.find(r => r.key === s.dismissReason)?.label || s.dismissReason}
+                      </div>
+                    )}
+
+                    {/* Hook Variations */}
+                    {hooks && (
+                      <div style={{ margin: '12px 0', padding: 16, background: 'var(--fill-secondary)', borderRadius: 12 }}>
+                        <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10, color: 'var(--text-primary)' }}>🔄 Hook Variations</div>
+                        {hooks.map((h, i) => (
+                          <div key={i} style={{ padding: '10px 14px', marginBottom: 6, borderRadius: 8, background: 'var(--bg-primary)', border: '1px solid var(--border-primary)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, cursor: 'pointer' }} onClick={() => copyText(h.hook, `hook_${s.id}_${i}`)}>
+                            <div>
+                              <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--blue)', textTransform: 'uppercase' }}>{h.style}</span>
+                              <div style={{ fontSize: 14, color: 'var(--text-primary)', marginTop: 2, fontWeight: 500 }}>"{h.hook}"</div>
                             </div>
-                            <pre style={{
-                              fontSize: 13, lineHeight: 1.6, color: 'var(--text-primary)',
-                              whiteSpace: 'pre-wrap', wordBreak: 'break-word',
-                              fontFamily: 'inherit', margin: 0,
-                            }}>{data.content}</pre>
-                            {data.charCount && <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 8 }}>{data.charCount} characters</div>}
+                            <span style={{ fontSize: 11, color: 'var(--text-tertiary)', flexShrink: 0 }}>{copied === `hook_${s.id}_${i}` ? '✓ Copied' : 'Click to copy'}</span>
                           </div>
-                        );
-                      })}
-                    </div>
-                  )}
+                        ))}
+                      </div>
+                    )}
 
-                  {/* Actions */}
-                  <div className="ci-suggestion-actions" style={{ flexWrap: 'wrap' }}>
-                    <button className={`btn-copy ${copied === s.id ? 'copied' : ''}`} onClick={() => copyText(s.suggestion, s.id)}>
-                      {copied === s.id ? '✓ Copied!' : '📋 Copy'}
-                    </button>
+                    {/* Repurposed Content */}
+                    {activeRepurpose.length > 0 && (
+                      <div style={{ margin: '12px 0' }}>
+                        {activeRepurpose.map(([key, data]) => {
+                          const fmt = key.split('_').pop();
+                          const fmtMeta = REPURPOSE_FORMATS.find(f => f.key === fmt) || {};
+                          return (
+                            <div key={key} style={{ padding: 16, marginBottom: 8, borderRadius: 12, background: 'linear-gradient(135deg, rgba(88,86,214,0.04), rgba(0,122,255,0.04))', border: '1px solid rgba(88,86,214,0.15)' }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                                <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--purple)' }}>{fmtMeta.icon} {fmtMeta.label} Format</span>
+                                <button className="btn-copy" onClick={() => copyText(data.content, key)} style={{ fontSize: 12 }}>{copied === key ? '✓ Copied!' : '📋 Copy'}</button>
+                              </div>
+                              <pre style={{ fontSize: 13, lineHeight: 1.6, color: 'var(--text-primary)', whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontFamily: 'inherit', margin: 0 }}>{data.content}</pre>
+                              {data.charCount && <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 8 }}>{data.charCount} characters</div>}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
 
-                    {/* Hook Variations Button */}
-                    <button
-                      className="btn btn-outline"
-                      style={{ fontSize: 13, padding: '7px 14px', background: hooks ? 'rgba(255,149,0,0.08)' : undefined }}
-                      onClick={() => hooks ? setHookResults(prev => { const n = {...prev}; delete n[s.id]; return n; }) : generateHooks(s.id, s.suggestion, s.angle)}
-                      disabled={hookLoading === s.id}
-                    >
-                      {hookLoading === s.id ? <><span className="spinner" style={{ width: 14, height: 14 }} /> Generating…</> : hooks ? '🪝 Hide Hooks' : '🪝 Hook Variations'}
-                    </button>
-
-                    {/* Repurpose Button */}
-                    <div style={{ position: 'relative', display: 'inline-block' }}>
-                      <button
-                        className="btn btn-outline"
-                        style={{ fontSize: 13, padding: '7px 14px' }}
-                        onClick={() => setShowRepurpose(showRepurpose === s.id ? null : s.id)}
-                      >
-                        ✂️ Repurpose
+                    {/* Actions */}
+                    <div className="ci-suggestion-actions" style={{ flexWrap: 'wrap' }}>
+                      <button className={`btn-copy ${copied === s.id ? 'copied' : ''}`} onClick={() => copyText(s.suggestion, s.id)}>
+                        {copied === s.id ? '✓ Copied!' : '📋 Copy'}
                       </button>
-                      {showRepurpose === s.id && (
-                        <div style={{
-                          position: 'absolute', bottom: '100%', left: 0, marginBottom: 6, zIndex: 100,
-                          background: 'var(--bg-secondary)', border: '1px solid var(--border-primary)',
-                          borderRadius: 12, boxShadow: '0 8px 32px rgba(0,0,0,0.15)', padding: 8,
-                          minWidth: 180,
-                        }}>
-                          {REPURPOSE_FORMATS.map(f => {
-                            const rKey = `${s.id}_${f.key}`;
-                            return (
+
+                      <button className="btn btn-outline" style={{ fontSize: 13, padding: '7px 14px', background: hooks ? 'rgba(255,149,0,0.08)' : undefined }}
+                        onClick={() => hooks ? setHookResults(prev => { const n = {...prev}; delete n[s.id]; return n; }) : generateHooks(s.id, s.suggestion, s.angle)}
+                        disabled={hookLoading === s.id}>
+                        {hookLoading === s.id ? <><span className="spinner" style={{ width: 14, height: 14 }} /> Generating…</> : hooks ? '🪝 Hide Hooks' : '🪝 Hook Variations'}
+                      </button>
+
+                      <div style={{ position: 'relative', display: 'inline-block' }}>
+                        <button className="btn btn-outline" style={{ fontSize: 13, padding: '7px 14px' }} onClick={() => setShowRepurpose(showRepurpose === s.id ? null : s.id)}>
+                          ✂️ Repurpose
+                        </button>
+                        {showRepurpose === s.id && (
+                          <div style={{ position: 'absolute', bottom: '100%', left: 0, marginBottom: 6, zIndex: 100, background: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', borderRadius: 12, boxShadow: '0 8px 32px rgba(0,0,0,0.15)', padding: 8, minWidth: 180 }}>
+                            {REPURPOSE_FORMATS.map(f => (
                               <button key={f.key} onClick={() => { repurpose(s.id, s.suggestion, f.key); setShowRepurpose(null); }}
-                                disabled={repurposeLoading === rKey}
-                                style={{
-                                  display: 'flex', alignItems: 'center', gap: 8, width: '100%',
-                                  padding: '8px 12px', border: 'none', borderRadius: 8,
-                                  background: repurposeResults[rKey] ? 'rgba(52,199,89,0.08)' : 'transparent',
-                                  cursor: 'pointer', fontSize: 13, color: 'var(--text-primary)',
-                                  transition: 'background 0.15s',
-                                }}
-                                onMouseEnter={e => e.target.style.background = 'var(--fill-secondary)'}
-                                onMouseLeave={e => e.target.style.background = repurposeResults[rKey] ? 'rgba(52,199,89,0.08)' : 'transparent'}
-                              >
+                                disabled={repurposeLoading === `${s.id}_${f.key}`}
+                                style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '8px 12px', border: 'none', borderRadius: 8, background: repurposeResults[`${s.id}_${f.key}`] ? 'rgba(52,199,89,0.08)' : 'transparent', cursor: 'pointer', fontSize: 13, color: 'var(--text-primary)' }}>
                                 <span>{f.icon}</span> {f.label}
-                                {repurposeResults[rKey] && <span style={{ marginLeft: 'auto', color: 'var(--green)', fontSize: 11 }}>✓</span>}
+                                {repurposeResults[`${s.id}_${f.key}`] && <span style={{ marginLeft: 'auto', color: 'var(--green)', fontSize: 11 }}>✓</span>}
                               </button>
-                            );
-                          })}
-                        </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      {s.status === 'pending' && (
+                        <>
+                          <button className="btn btn-outline" style={{ fontSize: 13, padding: '7px 14px' }} onClick={() => updateStatus(s.id, 'used')}>✅ Mark Used</button>
+
+                          {/* Dismiss with reason */}
+                          <div style={{ position: 'relative', display: 'inline-block' }}>
+                            <button className="btn-danger" onClick={() => setDismissingId(dismissingId === s.id ? null : s.id)}>✕ Dismiss</button>
+                            {dismissingId === s.id && (
+                              <div style={{ position: 'absolute', bottom: '100%', right: 0, marginBottom: 6, zIndex: 100, background: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', borderRadius: 12, boxShadow: '0 8px 32px rgba(0,0,0,0.15)', padding: 8, minWidth: 260 }}>
+                                <div style={{ padding: '6px 12px', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 4 }}>Why are you dismissing?</div>
+                                {DISMISS_REASONS.map(r => (
+                                  <button key={r.key} onClick={() => r.key === 'other' ? null : updateStatus(s.id, 'dismissed', r.key)}
+                                    style={{ display: 'block', width: '100%', padding: '8px 12px', border: 'none', borderRadius: 8, background: 'transparent', cursor: 'pointer', fontSize: 13, color: 'var(--text-primary)', textAlign: 'left' }}
+                                    onMouseEnter={e => e.target.style.background = 'var(--fill-secondary)'}
+                                    onMouseLeave={e => e.target.style.background = 'transparent'}>
+                                    {r.key === 'other' ? (
+                                      <div onClick={e => e.stopPropagation()}>
+                                        <div style={{ marginBottom: 6 }}>Other:</div>
+                                        <div style={{ display: 'flex', gap: 6 }}>
+                                          <input type="text" placeholder="Your reason…" value={dismissOtherText} onChange={e => setDismissOtherText(e.target.value)}
+                                            className="form-input" style={{ fontSize: 12, padding: '4px 8px', flex: 1 }}
+                                            onClick={e => e.stopPropagation()} />
+                                          <button className="btn-danger" style={{ fontSize: 11, padding: '4px 8px' }}
+                                            onClick={e => { e.stopPropagation(); updateStatus(s.id, 'dismissed', dismissOtherText || 'other'); }}>
+                                            Go
+                                          </button>
+                                        </div>
+                                      </div>
+                                    ) : r.label}
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </>
+                      )}
+                      {s.status !== 'pending' && (
+                        <button className="btn btn-outline" style={{ fontSize: 13, padding: '7px 14px' }} onClick={() => updateStatus(s.id, 'pending')}>↩ Restore</button>
                       )}
                     </div>
-
-                    {s.status === 'pending' && (
-                      <>
-                        <button className="btn btn-outline" style={{ fontSize: 13, padding: '7px 14px' }} onClick={() => updateStatus(s.id, 'used')}>✅ Mark Used</button>
-                        <button className="btn-danger" onClick={() => updateStatus(s.id, 'dismissed')}>✕ Dismiss</button>
-                      </>
-                    )}
-                    {s.status !== 'pending' && (
-                      <button className="btn btn-outline" style={{ fontSize: 13, padding: '7px 14px' }} onClick={() => updateStatus(s.id, 'pending')}>↩ Restore</button>
-                    )}
                   </div>
                 </div>
               );
