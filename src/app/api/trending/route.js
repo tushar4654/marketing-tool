@@ -43,6 +43,44 @@ function compressPostsForAnalysis(posts) {
   }).join('\n');
 }
 
+/**
+ * Match posts to topics by keyword matching (ZERO extra Claude cost).
+ * Returns top 5 posts per topic from the database.
+ */
+function matchPostsToTopics(topics, allPosts) {
+  return topics.map(topic => {
+    const keywords = [
+      topic.topic.toLowerCase(),
+      ...(topic.angles || []).map(a => a.toLowerCase()),
+      ...(topic.description || '').toLowerCase().split(/\s+/).filter(w => w.length > 4),
+    ];
+    
+    const scored = allPosts.map(post => {
+      const text = (post.content || '').toLowerCase();
+      let score = 0;
+      for (const kw of keywords) {
+        if (text.includes(kw)) score += kw.length > 8 ? 3 : 1;
+      }
+      if (topic.accounts?.some(a => (post.source?.name || '').toLowerCase().includes(a.toLowerCase()))) score += 5;
+      return { post, score };
+    }).filter(s => s.score > 0).sort((a, b) => b.score - a.score).slice(0, 8);
+
+    return {
+      ...topic,
+      matchedPosts: scored.map(({ post, score }) => ({
+        id: post.id,
+        content: post.content.slice(0, 300),
+        authorName: post.authorName || post.source?.name || 'Unknown',
+        platform: post.platform,
+        postUrl: post.postUrl,
+        postedAt: post.postedAt,
+        sourceName: post.source?.name,
+        relevance: score,
+      })),
+    };
+  });
+}
+
 export async function GET(request) {
   try {
     const url = new URL(request.url);
@@ -60,23 +98,14 @@ export async function GET(request) {
     const apiKey = process.env.ANTHROPIC_API_KEY;
     if (!apiKey) return NextResponse.json({ error: 'ANTHROPIC_API_KEY not set' }, { status: 500 });
 
-    // Load persona if selected
     let persona = null;
     let personaContext = '';
     if (personaId) {
       persona = await prisma.persona.findUnique({ where: { id: personaId } });
       if (persona?.contextMarkdown) {
-        // Extract key sections from the content brief for the system prompt
-        personaContext = `
-## POST WRITER PERSONA
-You are writing posts for ${persona.name} (${persona.role.toUpperCase()}).
-Use their content strategy brief to shape every suggestion:
-
-${persona.contextMarkdown}
-
-IMPORTANT: Every draft must match this persona's voice, positioning, audience, and content buckets as defined above.`;
+        personaContext = `\n## POST WRITER PERSONA\nYou are writing posts for ${persona.name} (${persona.role.toUpperCase()}).\n${persona.contextMarkdown}\nIMPORTANT: Every draft must match this persona's voice and positioning.`;
       } else if (persona) {
-        personaContext = `\n## POST WRITER PERSONA\nYou are writing posts for ${persona.name} (${persona.role.toUpperCase()}). Write in their voice.`;
+        personaContext = `\n## POST WRITER PERSONA\nYou are writing posts for ${persona.name} (${persona.role.toUpperCase()}).`;
       }
     }
 
@@ -99,15 +128,15 @@ IMPORTANT: Every draft must match this persona's voice, positioning, audience, a
         model: 'claude-sonnet-4-20250514',
         max_tokens: 8192,
         temperature: 0.5,
-        system: `Extract trending topics from social media posts AND generate 2 LinkedIn post drafts per topic.${personaContext}
+        system: `Extract trending topics from social posts AND generate 2 LinkedIn drafts per topic.${personaContext}
 
 Return ONLY a valid JSON array:
 [{"topic":"short name","description":"one line","count":N,"accounts":["name1"],"heat":1-10,"emoji":"🤖","angles":["angle1","angle2"],"platforms":["twitter"],
 "suggestions":[
-  {"hook":"Punchy 1-2 line hook in persona voice","draft":"Short 2-paragraph post (60-80 words). Opinionated, specific, ends with question.","bucket":"Tactical"},
+  {"hook":"Punchy 1-2 line hook","draft":"Short 2-paragraph post (60-80 words). Opinionated, ends with question.","bucket":"Tactical"},
   {"hook":"Another hook","draft":"Another short draft (60-80 words)","bucket":"Topical"}
 ]}]
-Rules: 6-8 topics. Sort by heat desc. Each topic gets exactly 2 suggestions. Keep drafts SHORT (60-80 words). ${persona?.contextMarkdown ? 'Use content buckets from the brief.' : 'Buckets: Humble Brag, Build in Public, Tactical, Topical.'}`,
+Rules: 6-8 topics. Sort by heat desc. Each topic gets exactly 2 suggestions. Keep drafts SHORT. ${persona?.contextMarkdown ? 'Use content buckets from the brief.' : 'Buckets: Humble Brag, Build in Public, Tactical, Topical.'}`,
         messages: [{ role: 'user', content: `${sourceCount} accounts, ${posts.length} posts:\n${compressed}` }],
       }),
     });
@@ -119,23 +148,21 @@ Rules: 6-8 topics. Sort by heat desc. Each topic gets exactly 2 suggestions. Kee
 
     const data = await resp.json();
     const text = data?.content?.[0]?.text || '[]';
-    const topics = JSON.parse(text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim());
+    const rawTopics = JSON.parse(text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim());
+    
+    // Match actual posts to each topic (keyword matching — ZERO extra Claude cost)
+    const topics = matchPostsToTopics(rawTopics, posts);
 
     const usage = data?.usage || {};
     console.log(`[Trending] Claude tokens — input: ${usage.input_tokens || '?'}, output: ${usage.output_tokens || '?'}`);
 
     const platformCounts = {};
-    const sourceCounts = {};
-    for (const p of posts) {
-      platformCounts[p.platform] = (platformCounts[p.platform] || 0) + 1;
-      sourceCounts[p.source?.name || '?'] = (sourceCounts[p.source?.name || '?'] || 0) + 1;
-    }
-    const topSources = Object.entries(sourceCounts).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([name, count]) => ({ name, count }));
+    for (const p of posts) platformCounts[p.platform] = (platformCounts[p.platform] || 0) + 1;
 
     const result = {
       topics,
       persona: persona ? { id: persona.id, name: persona.name, role: persona.role } : null,
-      stats: { totalPosts: posts.length, platforms: platformCounts, topSources, analyzedAt: new Date().toISOString(), tokensUsed: { input: usage.input_tokens, output: usage.output_tokens } },
+      stats: { totalPosts: posts.length, platforms: platformCounts, analyzedAt: new Date().toISOString(), tokensUsed: { input: usage.input_tokens, output: usage.output_tokens } },
     };
 
     setCachedData(personaId, result);
