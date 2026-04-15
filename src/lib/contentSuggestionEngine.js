@@ -6,7 +6,59 @@ const CLAUDE_MODEL = 'claude-sonnet-4-20250514';
 const BATCH_SIZE = 8;
 
 /**
- * Detect if persona context includes a structured content brief (buckets, positioning, etc.)
+ * LinkedIn Content Frameworks that consistently drive engagement.
+ * These are injected into the Claude prompt to produce better output.
+ */
+const CONTENT_FRAMEWORKS = `
+## HIGH-PERFORMING LINKEDIN POST FRAMEWORKS
+
+Use these proven frameworks. EVERY suggestion must follow one:
+
+### 1. Contrarian Take
+"Everyone says [common belief]. Here's why that's wrong."
+→ State the conventional wisdom, then demolish it with a specific example
+→ End with: "The real lesson? [insight]"
+
+### 2. Story → Lesson  
+"Last [time period], [specific thing happened]."  
+→ Tell a 3-sentence story with a turning point  
+→ Extract 2-3 specific bullet-point lessons  
+→ End with a question to the audience
+
+### 3. Before/After Transformation
+"6 months ago: [old state]. Today: [new state]."
+→ Show the journey with specific metrics or examples
+→ List the 3 things that changed
+
+### 4. "Most people think X, but top performers do Y"
+→ Split screen contrast between common and elite approaches
+→ Each point should be specific, not generic
+
+### 5. Framework / How-To List
+"My [X]-step framework for [result]:"
+→ Numbered steps (3-5 max)
+→ Each step has a bold label + one-line explanation
+→ End with "Which step are you stuck on?"
+
+### 6. Data-Driven Insight
+"[Surprising stat or data point]."
+→ Add context: what this means for the reader
+→ Give one actionable takeaway
+
+## POST FORMATTING RULES (LinkedIn-specific)
+- First 2 lines = HOOK. Must stop the scroll. Under 20 words.
+- Use short paragraphs (1-2 sentences each)
+- Add line breaks between paragraphs (LinkedIn rewards whitespace)
+- 150-250 words total (optimal LinkedIn length)
+- End with a QUESTION or CALL TO ACTION (drives comments)
+- NO hashtags in the middle of posts (put 3-5 at the very end if needed)
+- Use "I" and "we" — first person always
+- Include ONE specific example, number, or name (specificity = credibility)
+- Avoid corporate jargon: "leverage", "synergy", "paradigm", "ecosystem"
+`;
+
+/**
+ * Detect if persona context includes a structured content brief
  */
 function hasStructuredBrief(contextMarkdown) {
   if (!contextMarkdown) return false;
@@ -15,7 +67,7 @@ function hasStructuredBrief(contextMarkdown) {
 }
 
 /**
- * Build system prompt — adapts based on whether persona has a structured brief or not.
+ * Build system prompt — now with content frameworks for much better output quality
  */
 function buildSystemPrompt(persona, allSources, memoryContext) {
   const sourceSummary = allSources.map(s => {
@@ -26,84 +78,84 @@ function buildSystemPrompt(persona, allSources, memoryContext) {
   const isStructured = hasStructuredBrief(persona.contextMarkdown);
 
   if (isStructured) {
-    // ─── STRUCTURED BRIEF MODE ──────────────────────────────
-    // The persona's contextMarkdown IS the full strategy brief.
-    // We pass it verbatim and ask Claude to follow it precisely.
-    return `You are ${persona.name}'s content strategist. You have a detailed Content Strategy Brief that defines positioning, audience, content buckets, copywriting principles, and reference examples.
+    return `You are ${persona.name}'s content ghostwriter. You write LinkedIn posts that sound like a real person, not a marketing team.
 
-## CONTENT STRATEGY BRIEF (follow this precisely)
+## CONTENT STRATEGY BRIEF (follow precisely)
 ${persona.contextMarkdown}
+
+${CONTENT_FRAMEWORKS}
 
 ## Tracked Accounts (Content Sources)
 ${sourceSummary || '[No sources configured]'}
 
-## Historical Content Intelligence (from Memory)
-${memoryContext || '[No historical memories available yet]'}
+## Historical Content Intelligence
+${memoryContext || '[No history yet]'}
 
 ## Your Task
-Analyze the provided content pieces and generate posting suggestions following the brief EXACTLY. For each suggestion, you MUST include:
+Analyze each content piece and generate READY-TO-POST LinkedIn drafts. Not angles. Not suggestions. Actual posts that ${persona.name} can copy-paste and publish.
 
-1. **fit_score** (1-10): How well this matches the persona's positioning + audience (per the brief)
-2. **buckets**: Array of which content buckets this maps to (e.g., ["Humble Brag", "Topical"])
-3. **suggestion**: The full suggested post text (2-4 paragraphs, LinkedIn-optimized)
-4. **hook_idea**: The opening hook — two lines max, following the copywriting principles in the brief
-5. **angle**: The specific reframe or POV (not a recap of the source)
-6. **why_it_works**: Which copywriting principles it hits and which audience segment it targets
-7. **risks**: Honest assessment of why it might flop or miss
-
-FILTER AGGRESSIVELY: If a content piece scores below 4 on fit, SKIP IT. Only suggest posts that genuinely match the positioning.
+Rules:
+- SKIP any source content scoring below 4 on fit
+- Each post must follow ONE of the frameworks above
+- Write in ${persona.name}'s voice — authoritative but human
+- Include the framework name used in the "framework" field
+- Every post must have a scroll-stopping hook (first 2 lines)
+- Every post must end with a question or CTA
 
 ## Response Format
-Respond ONLY with a valid JSON array. No markdown, no code fences:
-[
-  {
-    "source_index": 0,
-    "fit_score": 8,
-    "buckets": ["Tactical", "Build in Public"],
-    "suggestion": "Full post text...",
-    "hook_idea": "Hook line 1\\nHook line 2",
-    "angle": "The unique take...",
-    "why_it_works": "Hits specificity principle, targets primary audience...",
-    "risks": "Could feel too product-y if not framed right"
-  }
-]`;
+Return ONLY valid JSON array:
+[{
+  "source_index": 0,
+  "fit_score": 8,
+  "buckets": ["Tactical"],
+  "framework": "Contrarian Take",
+  "suggestion": "The complete, ready-to-post LinkedIn post text.\n\nWith proper line breaks.\n\nAnd formatting.",
+  "hook_idea": "The first 2 lines of the post",
+  "angle": "One-line description of the unique take",
+  "why_it_works": "Which copywriting principles it hits",
+  "risks": "Why it might not land"
+}]`;
   }
 
-  // ─── GENERIC MODE (original behavior) ──────────────────────
-  return `You are an expert social media strategist and content advisor. Your job is to analyze trending content from industry thought leaders and suggest original posts for a specific persona to publish on their LinkedIn.
+  // ─── GENERIC MODE ──────────────────────────────
+  return `You are ${persona.name}'s LinkedIn ghostwriter. You write posts that sound like a real human sharing hard-won insights — not a content marketer filling a calendar.
 
-## Persona Profile
+## Persona
 - **Name:** ${persona.name}
 - **Role:** ${persona.role.toUpperCase()}
-- **LinkedIn Profile:** ${persona.linkedinProfileUrl || '[Not configured]'}
+- **LinkedIn:** ${persona.linkedinProfileUrl || '[Not set]'}
+- **Context:** ${persona.contextMarkdown || '[No context — write as a seasoned tech executive]'}
 
-## Persona Context & Company Information
-${persona.contextMarkdown || '[No context provided]'}
+${CONTENT_FRAMEWORKS}
 
-## Tracked Accounts (Content Sources)
-${sourceSummary || '[No sources configured yet]'}
+## Content Sources
+${sourceSummary || '[None]'}
 
-## Historical Content Intelligence (from Memory)
-${memoryContext || '[No historical memories available yet — sync sources to build memory]'}
+## Memory
+${memoryContext || '[No history]'}
 
 ## Your Task
-Analyze the provided content pieces and generate posting suggestions for this persona. Each suggestion should:
-1. **Be original** — Don't copy the source content. Offer a unique perspective.
-2. **Match the persona's voice** — CEO talks vision/culture, CTO about tech, CRO about revenue/pipeline.
-3. **Be engagement-optimized** — Include hooks, take a stance, use storytelling.
-4. **Reference the trend** — Ride the wave but bring a new angle.
-5. **Leverage historical patterns** — Use memory context for themes that consistently perform.
+Turn each source post into a READY-TO-POST LinkedIn draft for ${persona.name}. Not a summary. Not an "angle". A complete post they can copy and publish.
+
+For each post:
+1. Pick the best framework from the list above
+2. Write the FULL post (150-250 words, LinkedIn-formatted)
+3. Make the hook scroll-stopping (first 2 lines)
+4. Include at least one specific example, number, or story
+5. End with a question or CTA
+6. Write in first person — "I", not "we"
+
+CRITICAL: The post should feel like ${persona.name} wrote it after seeing the source content and being inspired — NOT like a rephrased version of the source.
 
 ## Response Format
-Respond ONLY with a valid JSON array:
-[
-  {
-    "source_index": 0,
-    "suggestion": "The full suggested post text (2-4 paragraphs, LinkedIn-optimized)",
-    "angle": "One sentence explaining the unique angle",
-    "hook_idea": "The opening hook line"
-  }
-]`;
+Return ONLY valid JSON array:
+[{
+  "source_index": 0,
+  "framework": "Story → Lesson",
+  "suggestion": "Complete ready-to-post text with\\n\\nproper LinkedIn formatting\\n\\nand line breaks.",
+  "hook_idea": "First 2 lines that stop the scroll",
+  "angle": "One line: what makes this take unique"
+}]`;
 }
 
 async function callClaude(systemPrompt, userPrompt) {
@@ -172,7 +224,7 @@ export async function generateSuggestions(personaId) {
   }
 
   const isStructured = hasStructuredBrief(persona.contextMarkdown);
-  console.log(`[Suggestions] Generating for "${persona.name}" (${persona.role}) via Claude | ${newPosts.length} posts | Brief: ${isStructured ? 'structured' : 'generic'} | Mem0: ${memoryContext ? 'yes' : 'no'}…`);
+  console.log(`[Suggestions] Generating for "${persona.name}" (${persona.role}) | ${newPosts.length} posts | Brief: ${isStructured ? 'structured' : 'generic'} | Mem0: ${memoryContext ? 'yes' : 'no'}`);
 
   const systemPrompt = buildSystemPrompt(persona, allSources, memoryContext);
   let totalGenerated = 0;
@@ -181,13 +233,12 @@ export async function generateSuggestions(personaId) {
   for (let i = 0; i < newPosts.length; i += BATCH_SIZE) {
     const batch = newPosts.slice(i, i + BATCH_SIZE);
 
-    // Sanitize content for JSON safety
     const sanitize = (s) => s.replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])/g, '').replace(/(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, '').replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '');
 
-    const userPrompt = `Generate content suggestions based on these ${batch.length} pieces of content:\n\n${batch.map((p, idx) => {
+    const userPrompt = `Write LinkedIn posts inspired by these ${batch.length} pieces of content:\n\n${batch.map((p, idx) => {
       const platformLabel = p.platform === 'blog' ? '📝 Blog' : p.platform === 'twitter' ? '🐦 Twitter' : '💼 LinkedIn';
       return `[${idx}] ${platformLabel} | Source: "${p.source?.name || 'Unknown'}" | Author: ${p.authorName || 'Unknown'}\nContent: "${sanitize(p.content.slice(0, 800))}${p.content.length > 800 ? '…' : ''}"`;
-    }).join('\n\n')}\n\nGenerate suggestions only for content that fits. Return a JSON array.`;
+    }).join('\n\n')}\n\nWrite COMPLETE ready-to-post drafts. Use the frameworks provided. Return JSON array.`;
 
     try {
       const results = await callClaude(systemPrompt, userPrompt);
@@ -198,22 +249,22 @@ export async function generateSuggestions(personaId) {
         const post = batch[idx] || batch[0];
         if (!post || !result.suggestion) continue;
 
-        // For structured briefs: skip low-fit suggestions
         if (isStructured && result.fit_score && result.fit_score < 4) {
           totalSkipped++;
           continue;
         }
 
-        // Build rich angle with structured metadata
+        // Build rich angle with framework and metadata
         let richAngle = result.angle || '';
+        const parts = [];
+        if (result.framework) parts.push(`Framework: ${result.framework}`);
         if (isStructured) {
-          const parts = [];
           if (result.fit_score) parts.push(`Fit: ${result.fit_score}/10`);
           if (result.buckets?.length) parts.push(`Buckets: ${result.buckets.join(' + ')}`);
           if (result.why_it_works) parts.push(`Why: ${result.why_it_works}`);
           if (result.risks) parts.push(`Risks: ${result.risks}`);
-          if (parts.length > 0) richAngle = `${richAngle}\n\n${parts.join('\n')}`;
         }
+        if (parts.length > 0) richAngle = `${richAngle}\n\n${parts.join('\n')}`;
 
         try {
           await prisma.contentSuggestion.create({

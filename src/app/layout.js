@@ -3,6 +3,7 @@ import { usePathname } from 'next/navigation';
 import './globals.css';
 
 const NAV = [
+  { href: '/', icon: '✨', label: 'Today's Brief' },
   { href: '/content-sources', icon: '📡', label: 'Content Sources' },
   { href: '/content-feed',    icon: '📰', label: 'All Feed' },
   { href: '/personas',        icon: '👤', label: 'Personas' },
@@ -16,7 +17,7 @@ function Sidebar() {
   return (
     <aside className="sidebar">
       <div className="sidebar-logo">
-        <a href="/content-feed" className="logo-mark">
+        <a href="/" className="logo-mark">
           <div className="logo-icon">⚡</div>
           <div>
             <span className="logo-name">Content Engine</span>
@@ -26,7 +27,7 @@ function Sidebar() {
       </div>
       <nav className="sidebar-nav">
         {NAV.map(n => {
-          const active = path === n.href || path.startsWith(n.href + '/');
+          const active = n.href === '/' ? path === '/' : path === n.href || path.startsWith(n.href + '/');
           return (
             <a key={n.href} href={n.href} className={active ? 'active' : ''}>
               <span>{n.icon}</span>

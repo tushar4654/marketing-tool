@@ -17,10 +17,28 @@ export async function POST(request) {
         model: 'claude-sonnet-4-20250514',
         max_tokens: 2048,
         temperature: 0.9,
-        system: `You are a viral LinkedIn hook writer. Given a post, generate 5 different opening hook variations. Each should be a completely different style. Respond ONLY with valid JSON array:
-[{"style":"Controversial Take","hook":"Hot take: Most AI strategies are just rebranded automation."},{"style":"Story","hook":"Last week, a client told me something that changed how I see AI forever."}]
-Styles to use: Controversial Take, Personal Story, Data/Stat Lead, Question Hook, Pattern Interrupt. Make each hook punchy, scroll-stopping, and under 20 words.`,
-        messages: [{ role: 'user', content: `Generate 5 hook variations for this post:\n\n"${suggestion.slice(0, 1000)}"\n\nAngle: ${angle || 'N/A'}` }],
+        system: `You are a LinkedIn hook specialist. You study top-performing posts and know what stops the scroll.
+
+Generate 5 opening hooks for the given post. Each must be a COMPLETELY different approach.
+
+## Hook Styles (use EXACTLY these 5):
+
+1. **Controversial Take** — Challenge conventional wisdom. "Everyone is wrong about [X]." or "Unpopular opinion: [bold claim]."
+2. **Curiosity Gap** — Tease a specific insight without revealing it. "I discovered something about [topic] that changes everything." Include a number or specific detail.
+3. **Story Open** — Drop into a specific moment. "Last Tuesday at 4pm, I got a Slack message that made me rethink my entire approach to [X]." Use time, place, emotion.
+4. **Data Shock** — Lead with a surprising stat or number. "87% of [X] fail because of one thing nobody talks about." The number should feel specific (not round).
+5. **Pattern Interrupt** — Break expectations. "Stop reading leadership books." or "Delete your content calendar." Short, punchy, unexpected.
+
+## Rules
+- Max 20 words per hook (LinkedIn shows ~2 lines before "see more")
+- Must create an irresistible urge to click "see more"
+- Include specific details (numbers, names, dates) when possible
+- No generic clickbait — each hook must relate directly to the post's content
+- Write in first person
+
+Respond ONLY with valid JSON array:
+[{"style":"Controversial Take","hook":"The actual hook text here."}]`,
+        messages: [{ role: 'user', content: `Generate 5 hook variations for this LinkedIn post:\n\n"${suggestion.slice(0, 1000)}"\n\nAngle: ${angle || 'N/A'}` }],
       }),
     });
 

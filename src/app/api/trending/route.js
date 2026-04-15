@@ -128,15 +128,29 @@ export async function GET(request) {
         model: 'claude-sonnet-4-20250514',
         max_tokens: 8192,
         temperature: 0.5,
-        system: `Extract trending topics from social posts AND generate 2 LinkedIn drafts per topic.${personaContext}
+        system: `Extract trending topics from social posts AND generate 2 READY-TO-POST LinkedIn drafts per topic.${personaContext}
 
-Return ONLY a valid JSON array:
+## FRAMEWORKS FOR DRAFTS (use one per draft)
+- Contrarian Take: "Everyone says [X]. Here's why that's wrong." + specific example
+- Story → Lesson: "Last [time], [thing happened]." → 3 bullet lessons → question
+- Before/After: "6 months ago: [old]. Today: [new]." → what changed
+- Framework List: "My [N]-step framework for [result]:" → numbered steps
+- Data Lead: "[Surprising stat]." → context → actionable takeaway
+
+## POST RULES
+- Hook = first 2 lines, under 20 words, scroll-stopping
+- 150-200 words total, short paragraphs with line breaks
+- First person ("I"), include ONE specific example/number
+- End with a QUESTION or CTA
+- NO corporate jargon. Sound human.
+
+Return ONLY valid JSON array:
 [{"topic":"short name","description":"one line","count":N,"accounts":["name1"],"heat":1-10,"emoji":"🤖","angles":["angle1","angle2"],"platforms":["twitter"],
 "suggestions":[
-  {"hook":"Punchy 1-2 line hook","draft":"Short 2-paragraph post (60-80 words). Opinionated, ends with question.","bucket":"Tactical"},
-  {"hook":"Another hook","draft":"Another short draft (60-80 words)","bucket":"Topical"}
+  {"hook":"2-line scroll-stopping hook","draft":"Complete 150-200 word LinkedIn post.\\n\\nWith proper line breaks.\\n\\nEnds with question.","bucket":"Tactical","framework":"Contrarian Take"},
+  {"hook":"Different hook style","draft":"Different framework, different voice.\\n\\nSpecific examples.\\n\\nQuestion at end?","bucket":"Topical","framework":"Story → Lesson"}
 ]}]
-Rules: 6-8 topics. Sort by heat desc. Each topic gets exactly 2 suggestions. Keep drafts SHORT. ${persona?.contextMarkdown ? 'Use content buckets from the brief.' : 'Buckets: Humble Brag, Build in Public, Tactical, Topical.'}`,
+Rules: 6-8 topics. Sort by heat desc. Each topic gets exactly 2 suggestions with DIFFERENT frameworks. ${persona?.contextMarkdown ? 'Use content buckets from the brief.' : 'Buckets: Humble Brag, Build in Public, Tactical, Topical.'}`,
         messages: [{ role: 'user', content: `${sourceCount} accounts, ${posts.length} posts:\n${compressed}` }],
       }),
     });
