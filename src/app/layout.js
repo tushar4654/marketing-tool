@@ -4,7 +4,7 @@ import './globals.css';
 
 const NAV = [
   { href: '/content-sources', icon: '📡', label: 'Content Sources' },
-  { href: '/content-feed',    icon: '📰', label: 'Content Feed' },
+  { href: '/content-feed',    icon: '📰', label: 'All Feed' },
   { href: '/personas',        icon: '👤', label: 'Personas' },
   { href: '/suggestions',     icon: '💡', label: 'Suggestions' },
   { href: '/trending',        icon: '🔥', label: 'Trending' },

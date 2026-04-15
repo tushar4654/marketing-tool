@@ -7,9 +7,21 @@ export async function GET(request) {
     const platform = searchParams.get('platform') || 'all';
     const page = parseInt(searchParams.get('page') || '1', 10);
     const limit = parseInt(searchParams.get('limit') || '20', 10);
+    const dateFrom = searchParams.get('dateFrom');
+    const dateTo = searchParams.get('dateTo');
     const skip = (page - 1) * limit;
 
-    const where = platform !== 'all' ? { platform } : {};
+    const where = {};
+    if (platform !== 'all') where.platform = platform;
+    if (dateFrom || dateTo) {
+      where.postedAt = {};
+      if (dateFrom) where.postedAt.gte = new Date(dateFrom);
+      if (dateTo) {
+        const end = new Date(dateTo);
+        end.setHours(23, 59, 59, 999);
+        where.postedAt.lte = end;
+      }
+    }
 
     const [posts, total] = await Promise.all([
       prisma.contentPost.findMany({
@@ -22,12 +34,7 @@ export async function GET(request) {
       prisma.contentPost.count({ where }),
     ]);
 
-    return NextResponse.json({
-      posts,
-      total,
-      page,
-      totalPages: Math.ceil(total / limit),
-    });
+    return NextResponse.json({ posts, total, page, totalPages: Math.ceil(total / limit) });
   } catch (err) {
     return NextResponse.json({ error: err.message }, { status: 500 });
   }

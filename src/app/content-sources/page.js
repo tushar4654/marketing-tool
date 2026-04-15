@@ -14,6 +14,9 @@ export default function ContentSourcesPage() {
   const [syncType, setSyncType] = useState(null);
   const [toast, setToast] = useState(null);
   const [form, setForm] = useState({ name: '', platform: 'linkedin', url: '', rssFeedUrl: '' });
+  const [viewMode, setViewMode] = useState('cards'); // 'cards' or 'table'
+  const [tableSort, setTableSort] = useState({ col: 'name', dir: 'asc' });
+  const [confirmDelete, setConfirmDelete] = useState(null);
 
   const showToast = (msg, err) => { setToast({ msg, err }); setTimeout(() => setToast(null), 4000); };
 
@@ -32,11 +35,7 @@ export default function ContentSourcesPage() {
     e.preventDefault();
     if (!form.name || !form.url) return;
     try {
-      const res = await fetch('/api/content-sources', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
-      });
+      const res = await fetch('/api/content-sources', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) });
       if (!res.ok) { const d = await res.json(); throw new Error(d.error); }
       setForm({ name: '', platform: 'linkedin', url: '', rssFeedUrl: '' });
       showToast('Source added');
@@ -48,6 +47,7 @@ export default function ContentSourcesPage() {
     try {
       await fetch(`/api/content-sources/${id}`, { method: 'DELETE' });
       showToast('Source removed');
+      setConfirmDelete(null);
       load();
     } catch (err) { showToast(err.message, true); }
   };
@@ -56,11 +56,7 @@ export default function ContentSourcesPage() {
     setSyncing(true);
     setSyncType(fullHistory ? 'history' : 'latest');
     try {
-      const res = await fetch('/api/content-sources/sync-all', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fullHistory }),
-      });
+      const res = await fetch('/api/content-sources/sync-all', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fullHistory }) });
       const data = await res.json();
       const total = (data.linkedin?.synced || 0) + (data.twitter?.synced || 0) + (data.rss?.synced || 0);
       showToast(`Synced ${total} posts${fullHistory ? ' (full history)' : ''}`);
@@ -70,8 +66,23 @@ export default function ContentSourcesPage() {
     setSyncType(null);
   };
 
+  const exportCSV = () => { window.open('/api/content-sources?format=csv', '_blank'); };
+
   const grouped = { linkedin: [], twitter: [], blog: [] };
   sources.forEach(s => { if (grouped[s.platform]) grouped[s.platform].push(s); });
+
+  const sortedSources = [...sources].sort((a, b) => {
+    const { col, dir } = tableSort;
+    const m = dir === 'asc' ? 1 : -1;
+    if (col === 'name') return m * (a.name || '').localeCompare(b.name || '');
+    if (col === 'platform') return m * a.platform.localeCompare(b.platform);
+    if (col === 'posts') return m * ((a._count?.posts || 0) - (b._count?.posts || 0));
+    if (col === 'synced') return m * (new Date(a.lastScrapedAt || 0) - new Date(b.lastScrapedAt || 0));
+    return 0;
+  });
+
+  const toggleSort = (col) => setTableSort(prev => ({ col, dir: prev.col === col && prev.dir === 'asc' ? 'desc' : 'asc' }));
+  const sortIcon = (col) => tableSort.col === col ? (tableSort.dir === 'asc' ? ' ▲' : ' ▼') : '';
 
   return (
     <>
@@ -82,21 +93,24 @@ export default function ContentSourcesPage() {
           <p>Track LinkedIn profiles, Twitter accounts, and blogs for content inspiration.</p>
         </div>
         <div style={{ display: 'flex', gap: 10 }}>
-          <button className="btn btn-outline" onClick={() => syncAll(true)} disabled={syncing} title="Fetch up to 100 historical posts per source (first-time recommended)">
+          <button className="btn btn-outline" onClick={exportCSV} title="Export all sources as CSV for vlookup">
+            📥 Export CSV
+          </button>
+          <button className="btn btn-outline" onClick={() => syncAll(true)} disabled={syncing}>
             {syncing && syncType === 'history' ? <><span className="spinner" /> Fetching…</> : '📚 Full History Sync'}
           </button>
-          <button className="btn btn-primary" onClick={() => syncAll(false)} disabled={syncing} title="Fetch only the latest post from each source">
+          <button className="btn btn-primary" onClick={() => syncAll(false)} disabled={syncing}>
             {syncing && syncType === 'latest' ? <><span className="spinner" /> Syncing…</> : '⚡ Sync Latest'}
           </button>
         </div>
       </div>
 
       <div className="page-body">
-        {/* Info banner */}
+        {/* Info */}
         <div className="pro-tip" style={{ marginBottom: 24, marginTop: 0 }}>
           <span>💡</span>
           <div>
-            <strong>Smart sync:</strong> New sources automatically get full history (100 posts) on first sync. Existing sources only fetch the latest post. Just click <strong>Sync Latest</strong> — the system handles the rest. Use <strong>Full History Sync</strong> only if you want to re-fetch everything.
+            <strong>Smart sync:</strong> New sources automatically get full history (100 posts) on first sync. Use <strong>Export CSV</strong> to download your list, vlookup against your master sheet, and find gaps.
           </div>
         </div>
 
@@ -136,17 +150,30 @@ export default function ContentSourcesPage() {
         </div>
 
         {/* Stats */}
-        <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
+        <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
           {Object.entries(PLATFORM_META).map(([key, meta]) => (
             <div className="stat-card" key={key}>
               <div className="stat-label">{meta.icon} {meta.label}</div>
               <div className="stat-value" style={{ color: meta.color }}>{grouped[key]?.length || 0}</div>
-              <div className="stat-sub">{grouped[key]?.reduce((a, s) => a + (s._count?.posts || 0), 0)} posts scraped</div>
+              <div className="stat-sub">{grouped[key]?.reduce((a, s) => a + (s._count?.posts || 0), 0)} posts</div>
             </div>
           ))}
+          <div className="stat-card">
+            <div className="stat-label">📊 Total</div>
+            <div className="stat-value">{sources.length}</div>
+            <div className="stat-sub">{sources.reduce((a, s) => a + (s._count?.posts || 0), 0)} posts</div>
+          </div>
         </div>
 
-        {/* Sources by platform */}
+        {/* View toggle */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+          <h2 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>All Sources ({sources.length})</h2>
+          <div className="segmented-control" style={{ minWidth: 200 }}>
+            <button className={viewMode === 'cards' ? 'active' : ''} onClick={() => setViewMode('cards')}>📊 Cards</button>
+            <button className={viewMode === 'table' ? 'active' : ''} onClick={() => setViewMode('table')}>📋 Table</button>
+          </div>
+        </div>
+
         {loading ? (
           <div className="empty-state"><span className="spinner" /></div>
         ) : sources.length === 0 ? (
@@ -155,7 +182,68 @@ export default function ContentSourcesPage() {
             <h3>No sources yet</h3>
             <p>Add LinkedIn profiles, Twitter accounts, or blog RSS feeds to start tracking content.</p>
           </div>
+        ) : viewMode === 'table' ? (
+          /* ─── TABLE VIEW ─── */
+          <div style={{ overflow: 'auto', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-primary)' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+              <thead>
+                <tr style={{ background: 'var(--fill-secondary)' }}>
+                  {[
+                    { col: 'name', label: 'Name' },
+                    { col: 'platform', label: 'Platform' },
+                    { col: 'url', label: 'URL' },
+                    { col: 'posts', label: 'Posts' },
+                    { col: 'synced', label: 'Last Synced' },
+                    { col: null, label: 'Actions' },
+                  ].map(h => (
+                    <th key={h.label} onClick={h.col ? () => toggleSort(h.col) : undefined} style={{
+                      padding: '12px 16px', textAlign: 'left', fontWeight: 600, color: 'var(--text-secondary)',
+                      cursor: h.col ? 'pointer' : 'default', userSelect: 'none', whiteSpace: 'nowrap',
+                      borderBottom: '1px solid var(--border-primary)',
+                    }}>
+                      {h.label}{h.col ? sortIcon(h.col) : ''}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {sortedSources.map(s => {
+                  const meta = PLATFORM_META[s.platform] || {};
+                  return (
+                    <tr key={s.id} style={{ borderBottom: '1px solid var(--border-primary)' }}>
+                      <td style={{ padding: '10px 16px', fontWeight: 600, color: 'var(--text-primary)' }}>{s.name}</td>
+                      <td style={{ padding: '10px 16px' }}>
+                        <span style={{ padding: '2px 8px', borderRadius: 100, fontSize: 11, fontWeight: 600, background: meta.color + '15', color: meta.color }}>
+                          {meta.icon} {meta.label}
+                        </span>
+                      </td>
+                      <td style={{ padding: '10px 16px', maxWidth: 300 }}>
+                        <a href={s.url} target="_blank" rel="noopener" style={{ color: 'var(--blue)', textDecoration: 'none', fontSize: 12 }}>
+                          {s.url.replace(/https?:\/\//, '').slice(0, 45)}{s.url.length > 50 ? '…' : ''}
+                        </a>
+                      </td>
+                      <td style={{ padding: '10px 16px', fontWeight: 600 }}>{s._count?.posts || 0}</td>
+                      <td style={{ padding: '10px 16px', fontSize: 12, color: 'var(--text-tertiary)' }}>
+                        {s.lastScrapedAt ? new Date(s.lastScrapedAt).toLocaleDateString() : 'Never'}
+                      </td>
+                      <td style={{ padding: '10px 16px' }}>
+                        {confirmDelete === s.id ? (
+                          <div style={{ display: 'flex', gap: 6 }}>
+                            <button className="btn-danger" onClick={() => deleteSource(s.id)} style={{ fontSize: 11 }}>Confirm</button>
+                            <button className="btn btn-outline" onClick={() => setConfirmDelete(null)} style={{ fontSize: 11, padding: '4px 8px' }}>Cancel</button>
+                          </div>
+                        ) : (
+                          <button className="btn-danger" onClick={() => setConfirmDelete(s.id)} style={{ fontSize: 11 }}>✕ Remove</button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         ) : (
+          /* ─── CARD VIEW ─── */
           Object.entries(PLATFORM_META).map(([platform, meta]) => {
             const items = grouped[platform];
             if (!items || items.length === 0) return null;
@@ -168,9 +256,7 @@ export default function ContentSourcesPage() {
                   {items.map(s => (
                     <div className="profile-card" key={s.id}>
                       <div className="profile-card-top">
-                        <div className="avatar-lg" style={{ background: `linear-gradient(135deg, ${meta.color}, var(--teal))` }}>
-                          {meta.icon}
-                        </div>
+                        <div className="avatar-lg" style={{ background: `linear-gradient(135deg, ${meta.color}, var(--teal))` }}>{meta.icon}</div>
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div className="profile-name">{s.name}</div>
                           <a className="profile-url" href={s.url} target="_blank" rel="noopener">{s.url.replace(/https?:\/\//, '').slice(0, 40)}…</a>
