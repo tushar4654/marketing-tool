@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { getMem0Client } from '@/lib/mem0';
 import { NextResponse } from 'next/server';
 

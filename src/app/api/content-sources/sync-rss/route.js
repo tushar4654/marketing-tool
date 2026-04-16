@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { prisma } from '@/lib/prisma';
 import { fetchRSSFeed } from '@/lib/rssFetcher';
 import { storeContentMemory } from '@/lib/mem0';

@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { prisma } from '@/lib/prisma';
 import { scrapeLinkedInContent } from '@/lib/apifyLinkedInContent';
 import { storeContentMemory } from '@/lib/mem0';

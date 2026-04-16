@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { generateSuggestions } from '@/lib/contentSuggestionEngine';
 import { NextResponse } from 'next/server';
 

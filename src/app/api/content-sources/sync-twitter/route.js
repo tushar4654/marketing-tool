@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { prisma } from '@/lib/prisma';
 import { scrapeTwitterBatch } from '@/lib/apifyTwitter';
 import { storeContentMemory } from '@/lib/mem0';

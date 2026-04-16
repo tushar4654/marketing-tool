@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 
 const CLAUDE_API = 'https://api.anthropic.com/v1/messages';
