@@ -3,7 +3,7 @@ import { usePathname } from 'next/navigation';
 import './globals.css';
 
 const NAV = [
-  { href: '/', icon: '✨', label: 'Today's Brief' },
+  { href: '/', icon: '✨', label: "Today's Brief" },
   { href: '/content-sources', icon: '📡', label: 'Content Sources' },
   { href: '/content-feed',    icon: '📰', label: 'All Feed' },
   { href: '/personas',        icon: '👤', label: 'Personas' },
