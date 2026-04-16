@@ -1,4 +1,5 @@
 export const dynamic = 'force-dynamic';
+export const maxDuration = 60;
 import { prisma } from '@/lib/prisma';
 import { NextResponse } from 'next/server';
 import { getCachedData, setCachedData } from '@/lib/trendingCache';

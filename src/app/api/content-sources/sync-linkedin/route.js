@@ -1,4 +1,5 @@
 export const dynamic = 'force-dynamic';
+export const maxDuration = 60;
 import { prisma } from '@/lib/prisma';
 import { scrapeLinkedInContent } from '@/lib/apifyLinkedInContent';
 import { storeContentMemory } from '@/lib/mem0';
