@@ -1,30 +1,9 @@
 import { prisma } from '@/lib/prisma';
 import { NextResponse } from 'next/server';
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
-import { join } from 'path';
+import { getCachedData, setCachedData } from '@/lib/trendingCache';
 
 const CLAUDE_API = 'https://api.anthropic.com/v1/messages';
-const CACHE_DIR = join(process.cwd(), '.cache');
-const CACHE_TTL_MS = 30 * 60 * 1000;
 
-function getCacheFile(personaId) { return join(CACHE_DIR, `trending_${personaId || 'default'}.json`); }
-
-function getCachedData(personaId) {
-  try {
-    const f = getCacheFile(personaId);
-    if (!existsSync(f)) return null;
-    const raw = JSON.parse(readFileSync(f, 'utf-8'));
-    if (Date.now() - raw._cachedAt > CACHE_TTL_MS) return null;
-    return raw;
-  } catch { return null; }
-}
-
-function setCachedData(personaId, data) {
-  try {
-    if (!existsSync(CACHE_DIR)) mkdirSync(CACHE_DIR, { recursive: true });
-    writeFileSync(getCacheFile(personaId), JSON.stringify({ ...data, _cachedAt: Date.now() }));
-  } catch (e) { console.error('[Trending] Cache write failed:', e.message); }
-}
 
 function sanitize(str) {
   return str.replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])/g, '').replace(/(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, '').replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '').replace(/\s+/g, ' ').trim();

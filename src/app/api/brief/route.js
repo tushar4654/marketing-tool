@@ -1,7 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import { NextResponse } from 'next/server';
-import { readFileSync, existsSync } from 'fs';
-import { join } from 'path';
+import { getAnyCachedTopics } from '@/lib/trendingCache';
 
 export async function GET() {
   try {
@@ -42,7 +41,6 @@ export async function GET() {
     let streak = 0;
     const daySet = new Set(usedByDay.map(s => s.createdAt.toISOString().split('T')[0]));
     const checkDate = new Date(now);
-    // Allow today to not have a post yet — start checking from yesterday if today has none
     if (!daySet.has(checkDate.toISOString().split('T')[0])) {
       checkDate.setDate(checkDate.getDate() - 1);
     }
@@ -52,25 +50,15 @@ export async function GET() {
       else break;
     }
 
-    // Trending topics from cache (ZERO Claude cost)
-    let hotTopics = [];
-    try {
-      const cacheDir = join(process.cwd(), '.cache');
-      const files = ['trending_default.json', ...Array.from({ length: 20 }, (_, i) => `trending_${i}.json`)];
-      for (const f of files) {
-        const fpath = join(cacheDir, f);
-        if (existsSync(fpath)) {
-          const cached = JSON.parse(readFileSync(fpath, 'utf-8'));
-          if (cached.topics) {
-            hotTopics = cached.topics.filter(t => t.heat >= 7).slice(0, 3).map(t => ({
-              topic: t.topic, emoji: t.emoji, heat: t.heat, description: t.description,
-              topDraft: t.suggestions?.[0] || null,
-            }));
-            break;
-          }
-        }
-      }
-    } catch {}
+    // Trending topics from in-memory cache (ZERO Claude cost)
+    const cachedTopics = getAnyCachedTopics();
+    const hotTopics = cachedTopics
+      .filter(t => t.heat >= 7)
+      .slice(0, 3)
+      .map(t => ({
+        topic: t.topic, emoji: t.emoji, heat: t.heat, description: t.description,
+        topDraft: t.suggestions?.[0] || null,
+      }));
 
     // Recent posts (last 24h)
     const recentPosts = await prisma.contentPost.count({ where: { scrapedAt: { gte: todayStart } } });

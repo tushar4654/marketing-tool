@@ -1,17 +1,17 @@
 {
-  "name": "app",
-  "version": "0.1.0",
+  "name": "content-engine",
+  "version": "1.0.0",
   "private": true,
   "scripts": {
     "dev": "next dev --webpack",
-    "build": "next build",
+    "build": "prisma generate && next build",
     "start": "next start",
     "lint": "eslint",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "db:push": "prisma db push",
+    "db:migrate": "prisma migrate deploy"
   },
   "dependencies": {
-    "@libsql/client": "^0.17.2",
-    "@prisma/adapter-libsql": "^7.6.0",
     "@prisma/client": "^7.6.0",
     "apify-client": "^2.22.3",
     "mem0ai": "^2.4.6",
