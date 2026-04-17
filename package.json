@@ -2,6 +2,9 @@
   "name": "content-engine",
   "version": "1.0.0",
   "private": true,
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "scripts": {
     "dev": "next dev --webpack",
     "build": "prisma generate && next build",
